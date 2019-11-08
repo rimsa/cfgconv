@@ -21,25 +21,54 @@
 
 */
 
-#include <iostream>
-#include <fstream>
-#include <CFG.h>
-#include <BFTraceReader.h>
-#include <DCFGReader.h>
+#ifndef BFTRACE_READER_H
+#define BFTRACE_READER_H
 
-int main(int argc, char* argv[]) {
-	if (argc != 2) {
-		std::cout << "Usage: " << argv[0] << " [BFTrace Input]\n";
-		return 1;
-	}
+#include <map>
+#include <set>
+#include <list>
 
-	BFTraceReader reader(argv[1]);
-	reader.loadCFGs();
+#include <CFGReader.h>
+#include <InputTokenizer.h>
 
-	for (CFG* cfg : reader.cfgs()) {
-		if (cfg->status() == CFG::VALID)
-			std::cout << *cfg;
-	}
+class BFTraceReader : public CFGReader {
+public:
+	enum TerminatorType {
+		JUMP,
+		CALL,
+		RETURN,
+		OTHER
+	};
 
-	return 0;
-}
+	struct BasicBlock {
+		int size;
+		TerminatorType type;
+		bool is_exit;
+	};
+
+	struct Symbol {
+		Addr start;
+		Addr end;
+		std::string filename;
+		std::string functname;
+		Addr bias;
+
+		std::map<Addr, BasicBlock> blocks;
+		std::map<Addr, std::set<Addr>> edges;
+		std::set<Addr> entries;
+	};
+
+	BFTraceReader(const std::string& filename);
+	virtual ~BFTraceReader();
+
+	virtual void loadCFGs();
+
+private:
+	InputTokenizer m_tokens;
+	InputTokenizer::Lexeme m_current;
+
+	void matchToken(InputTokenizer::Lexeme::Type type);
+
+};
+
+#endif

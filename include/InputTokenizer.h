@@ -21,25 +21,51 @@
 
 */
 
-#include <iostream>
+#ifndef INPUT_TOKENIZER_H
+#define INPUT_TOKENIZER_H
+
 #include <fstream>
-#include <CFG.h>
-#include <BFTraceReader.h>
-#include <DCFGReader.h>
+#include <Addr.h>
 
-int main(int argc, char* argv[]) {
-	if (argc != 2) {
-		std::cout << "Usage: " << argv[0] << " [BFTrace Input]\n";
-		return 1;
-	}
+class InputTokenizer {
+public:
+	struct Lexeme {
+		enum Type {
+			TKN_INVALID_TOKEN = -2,
+			TKN_UNEXPECTED_EOF,
+			TKN_EOF,
+			TKN_BRACKET_OPEN,
+			TKN_BRACKET_CLOSE,
+			TKN_ADDR,
+			TKN_NUMBER,
+			TKN_BOOL,
+			TKN_STRING,
+			TKN_KEYWORD
+		};
 
-	BFTraceReader reader(argv[1]);
-	reader.loadCFGs();
+		enum Type type;
+		std::string token;
 
-	for (CFG* cfg : reader.cfgs()) {
-		if (cfg->status() == CFG::VALID)
-			std::cout << *cfg;
-	}
+		union {
+			Addr addr;
+			int number;
+			bool boolean;
+		} data;
 
-	return 0;
-}
+		Lexeme() : type(TKN_EOF), token("") {}
+		virtual ~Lexeme() {}
+	};
+
+	InputTokenizer(std::fstream& input);
+	virtual ~InputTokenizer();
+
+	Lexeme nextToken();
+
+private:
+	std::fstream& m_input;
+
+	int nextChar();
+
+};
+
+#endif

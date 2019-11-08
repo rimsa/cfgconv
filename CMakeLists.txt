@@ -14,6 +14,8 @@ add_executable(cfgconv
 	src/CfgEdge.cpp
 	src/CFG.cpp
 	src/CFGReader.cpp
+	src/InputTokenizer.cpp
+	src/BFTraceReader.cpp
 	src/DCFGReader.cpp
 	src/cfgconv.cpp
 )
