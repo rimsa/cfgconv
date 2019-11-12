@@ -34,15 +34,17 @@
 #include <getopt.h>
 
 #include <CFG.h>
-#include <DCFGReader.h>
 #include <BFTraceReader.h>
+#include <CFGGrindReader.h>
+#include <DCFGReader.h>
 #include <Instruction.h>
 
 struct Config {
 	enum {
 		UNDEF_TYPE,
-        DCFG_TYPE,
-		BFTRACE_TYPE
+		BFTRACE_TYPE,
+		CFGGRIND_TYPE,
+		DCFG_TYPE
 	} type;
 
 	enum {
@@ -78,8 +80,9 @@ void usage(char* progname) {
 	std::cout << "Usage: " << progname << " <Options> [CFG file]" << std::endl;
 	std::cout << "Options:" << std::endl;
 	std::cout << "   -t   type        Input type" << std::endl;
-	std::cout << "                        dcfg: pinplay dcfg input format" << std::endl;
 	std::cout << "                        bftrace: bftrace input format" << std::endl;
+	std::cout << "                        cfggrind: cfggrind input format" << std::endl;
+	std::cout << "                        dcfg: pinplay dcfg input format" << std::endl;
 	std::cout << "   -s   show        Strategy to show CFGs" << std::endl;
 	std::cout << "                        all: show all CFGs [default]" << std::endl;
 	std::cout << "                        valid: show only valid CFGs" << std::endl;
@@ -106,10 +109,12 @@ void readoptions(int argc, char* argv[]) {
 	while ((opt = getopt(argc, argv, "t:s:r:a:A:i:d:")) != -1) {
 		switch (opt) {
 			case 't':
-				if (strcasecmp(optarg, "dcfg") == 0)
-					config.type = Config::DCFG_TYPE;
-				else if (strcasecmp(optarg, "bftrace") == 0)
+				if (strcasecmp(optarg, "bftrace") == 0)
 					config.type = Config::BFTRACE_TYPE;
+				else if (strcasecmp(optarg, "cfggrind") == 0)
+					config.type = Config::CFGGRIND_TYPE;
+				else if (strcasecmp(optarg, "dcfg") == 0)
+					config.type = Config::DCFG_TYPE;
 				else
 					throw std::string("invalid type: ") + optarg;
 
@@ -210,11 +215,14 @@ int main(int argc, char* argv[]) {
 
 
 		switch (config.type) {
-			case Config::DCFG_TYPE:
-				reader = new DCFGReader(config.input);
-				break;
 			case Config::BFTRACE_TYPE:
 				reader = new BFTraceReader(config.input);
+				break;
+			case Config::CFGGRIND_TYPE:
+				reader = new CFGGrindReader(config.input);
+				break;
+			case Config::DCFG_TYPE:
+				reader = new DCFGReader(config.input);
 				break;
 			default:
 				assert(false);
