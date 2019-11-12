@@ -45,8 +45,6 @@ void CFGGrindReader::loadCFGs() {
 			Addr addr = m_current.data.addr;
 			matchToken(InputTokenizer::Lexeme::TKN_ADDR);
 
-			matchToken(InputTokenizer::Lexeme::TKN_BOOL);
-
 			std::string fname = m_current.token;
 			matchToken(InputTokenizer::Lexeme::TKN_STRING);
 
@@ -80,6 +78,9 @@ void CFGGrindReader::loadCFGs() {
 				cfg->addEdge(entry, node);
 			}
 
+			int bsize = m_current.data.number;
+			matchToken(InputTokenizer::Lexeme::TKN_NUMBER);
+
 			matchToken(InputTokenizer::Lexeme::TKN_BRACKET_OPEN);
 			Addr iaddr = baddr;
 			while (m_current.type != InputTokenizer::Lexeme::TKN_BRACKET_CLOSE) {
@@ -92,6 +93,8 @@ void CFGGrindReader::loadCFGs() {
 				iaddr += size;
 			}
 			matchToken(InputTokenizer::Lexeme::TKN_BRACKET_CLOSE);
+
+			assert(bsize == data->size());
 
 			matchToken(InputTokenizer::Lexeme::TKN_BRACKET_OPEN);
 			while (m_current.type != InputTokenizer::Lexeme::TKN_BRACKET_CLOSE) {
