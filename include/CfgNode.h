@@ -60,8 +60,7 @@ public:
 
 	class BlockData : public Data {
 	public:
-		BlockData(Addr addr, int size = 0, bool indirect = false)
-			: Data(addr), m_size(size), m_indirect(indirect) {}
+		BlockData(Addr addr, int size = 0, bool indirect = false);
 		virtual ~BlockData() {};
 
 		int size() const { return m_size; }

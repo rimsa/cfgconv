@@ -22,6 +22,7 @@
 
 #include <cassert>
 
+#include <Instruction.h>
 #include <CfgNode.h>
 
 CfgNode::CfgNode(enum CfgNode::Type type)
@@ -66,6 +67,21 @@ void CfgNode::setData(CfgNode::Data* data) {
 	assert(false);
 }
 
+CfgNode::BlockData::BlockData(Addr addr, int size, bool indirect)
+	: Data(addr), m_size(size), m_indirect(indirect) {
+	int s = 0;
+	while (s < size) {
+		Instruction* i = Instruction::get(addr + s, 0);
+		if (i->size() == 0)
+			break;
+
+		s += i->size();
+		assert(s <= size);
+
+		this->addInstruction(i);
+	}
+}
+
 void CfgNode::BlockData::setIndirect(bool indirect) {
 	m_indirect = indirect;
 }
@@ -73,8 +89,18 @@ void CfgNode::BlockData::setIndirect(bool indirect) {
 void CfgNode::BlockData::addInstruction(Instruction* instr) {
 	assert(instr != 0 && instr->size() > 0);
 
-	m_instrs.push_back(instr);
-	m_size += instr->size();
+	if (m_instrs.empty()) {
+		assert(instr->addr() == m_addr);
+		m_instrs.push_back(instr);
+	} else {
+		Instruction* prev = m_instrs.back();
+		assert(instr->addr() == (prev->addr() + prev->size()));
+		m_instrs.push_back(instr);
+	}
+
+	int size = (instr->addr() + instr->size()) - m_addr;
+	if (size > m_size)
+		m_size = size;
 }
 
 void CfgNode::BlockData::addInstructions(const std::list<Instruction*>& instrs) {
