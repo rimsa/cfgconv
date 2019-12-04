@@ -36,6 +36,7 @@ public:
 			TKN_EOF,
 			TKN_BRACKET_OPEN,
 			TKN_BRACKET_CLOSE,
+			TKN_COLON,
 			TKN_ADDR,
 			TKN_NUMBER,
 			TKN_BOOL,
@@ -48,7 +49,7 @@ public:
 
 		union {
 			Addr addr;
-			int number;
+			unsigned long long number;
 			bool boolean;
 		} data;
 

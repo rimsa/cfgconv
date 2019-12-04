@@ -28,15 +28,20 @@ class CfgNode;
 
 class CfgEdge {
 public:
-	CfgEdge(CfgNode* src, CfgNode* dst);
+	CfgEdge(CfgNode* src, CfgNode* dst, unsigned long long count = 0);
 	virtual ~CfgEdge() {}
 
 	CfgNode* source() const { return m_src; }
 	CfgNode* destination() const { return m_dst; }
+	unsigned long long count() const { return m_count; }
+
+	void setCount(unsigned long long count) { m_count = count; }
+	void updateCount(unsigned long long count) { m_count += count; }
 
 private:
 	CfgNode* m_src;
 	CfgNode* m_dst;
+	unsigned long long m_count;
 
 };
 

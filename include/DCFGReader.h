@@ -83,6 +83,7 @@ private:
 	struct Edge {
 		int dst_id;
 		int edge_type;
+		unsigned long long count;
 	};
 
 	struct Symbol {

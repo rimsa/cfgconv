@@ -42,7 +42,7 @@ public:
 		VALID
 	};
 
-	CFG(Addr addr);
+	CFG(Addr addr, unsigned long long execs = 0);
 	virtual ~CFG();
 
 	Addr addr() const { return m_addr; }
@@ -62,11 +62,15 @@ public:
 	void addNode(CfgNode* node);
 
 	const std::set<CfgEdge*>& edges() const { return m_edges; }
-	bool containsEdge(CfgNode* src, CfgNode* dst) const;
-	void addEdge(CfgNode* src, CfgNode* dst);
+	CfgEdge* findEdge(CfgNode* src, CfgNode* dst) const;
+	void addEdge(CfgNode* src, CfgNode* dst, unsigned long long count = 0);
 
 	const std::set<CfgNode*>& successors(CfgNode* node) const;
 	const std::set<CfgNode*>& predecessors(CfgNode* node) const;
+
+	unsigned long long execs() const { return m_execs; }
+	void setExecs(unsigned long long execs) { m_execs = execs; }
+	void updateExecs(unsigned long long execs) { m_execs += execs; }
 
 	enum Status status() const { return m_status; }
 	enum CFG::Status check();
@@ -82,6 +86,7 @@ private:
 	enum Status m_status;
 	std::string m_functionName;
 	bool m_complete;
+	unsigned long long m_execs;
 
 	CfgNode* m_entryNode;
 	CfgNode* m_exitNode;

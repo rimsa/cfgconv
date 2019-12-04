@@ -45,6 +45,14 @@ void CFGGrindReader::loadCFGs() {
 			Addr addr = m_current.data.addr;
 			matchToken(InputTokenizer::Lexeme::TKN_ADDR);
 
+			unsigned long long execs = 0;
+			if (m_current.type == InputTokenizer::Lexeme::TKN_COLON) {
+				matchToken(InputTokenizer::Lexeme::TKN_COLON);
+
+				execs = m_current.data.number;
+				matchToken(InputTokenizer::Lexeme::TKN_NUMBER);
+			}
+
 			std::string fname = m_current.token;
 			matchToken(InputTokenizer::Lexeme::TKN_STRING);
 
@@ -52,6 +60,7 @@ void CFGGrindReader::loadCFGs() {
 
 			CFG* cfg = this->instance(addr);
 			cfg->setFunctionName(fname);
+			cfg->updateExecs(execs);
 		} else if (keyword == "node") {
 			Addr faddr = m_current.data.addr;
 			matchToken(InputTokenizer::Lexeme::TKN_ADDR);
@@ -75,7 +84,7 @@ void CFGGrindReader::loadCFGs() {
 			if (baddr == cfg->addr()) {
 				assert(cfg->entryNode() == 0);
 				CfgNode* entry = CFGReader::entryNode(cfg);
-				cfg->addEdge(entry, node);
+				cfg->addEdge(entry, node, cfg->execs());
 			}
 
 			int bsize = m_current.data.number;
@@ -112,14 +121,15 @@ void CFGGrindReader::loadCFGs() {
 
 			matchToken(InputTokenizer::Lexeme::TKN_BRACKET_OPEN);
 			while (m_current.type != InputTokenizer::Lexeme::TKN_BRACKET_CLOSE) {
+				CfgNode* dst = 0;
+
 				switch (m_current.type) {
 					case InputTokenizer::Lexeme::TKN_ADDR:
 						{
 							Addr saddr = m_current.data.addr;
 							matchToken(InputTokenizer::Lexeme::TKN_ADDR);
 
-							CfgNode* succ = this->nodeWithAddr(cfg, saddr);
-							cfg->addEdge(node, succ);
+							dst = this->nodeWithAddr(cfg, saddr);
 						}
 
 						break;
@@ -127,13 +137,11 @@ void CFGGrindReader::loadCFGs() {
 						keyword = m_current.token;
 						matchToken(InputTokenizer::Lexeme::TKN_KEYWORD);
 
-						if (keyword == "exit") {
-							CfgNode* exit = CFGReader::exitNode(cfg);
-							cfg->addEdge(node, exit);
-						} else if (keyword == "halt") {
-							CfgNode* halt = CFGReader::haltNode(cfg);
-							cfg->addEdge(node, halt);
-						} else {
+						if (keyword == "exit")
+							dst = CFGReader::exitNode(cfg);
+						else if (keyword == "halt")
+							dst = CFGReader::haltNode(cfg);
+						else {
 							std::cout << keyword << std::endl;
 							assert(false);
 						}
@@ -142,6 +150,16 @@ void CFGGrindReader::loadCFGs() {
 					default:
 						assert(false);
 				}
+
+				unsigned long long count = 0;
+				if (m_current.type == InputTokenizer::Lexeme::TKN_COLON) {
+					matchToken(InputTokenizer::Lexeme::TKN_COLON);
+
+					count = m_current.data.number;
+					matchToken(InputTokenizer::Lexeme::TKN_NUMBER);
+				}
+
+				cfg->addEdge(node, dst, count);
 			}
 			matchToken(InputTokenizer::Lexeme::TKN_BRACKET_CLOSE);
 		} else {

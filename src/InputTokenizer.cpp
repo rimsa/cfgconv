@@ -60,6 +60,10 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 					lex.token += (char) c;
 					lex.type = Lexeme::TKN_BRACKET_CLOSE;
 					state = 8;
+				} else if (c == ':') {
+					lex.token += (char) c;
+					lex.type = Lexeme::TKN_COLON;
+					state = 8;
 				} else if (c == '\"' || c == '\'') {
 					lex.type = Lexeme::TKN_STRING;
 					state = 6;
@@ -107,7 +111,7 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 					lex.token += (char) c;
 					state = 4;
 				} else {
-					lex.data.number = std::stoi(lex.token);
+					lex.data.number = std::stoull(lex.token);
 
 					if (c != -1)
 						m_input.putback(c);

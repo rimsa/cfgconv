@@ -24,8 +24,8 @@
 #include <CfgEdge.h>
 #include <cassert>
 
-CfgEdge::CfgEdge(CfgNode* src, CfgNode* dst)
-	: m_src(src), m_dst(dst) {
+CfgEdge::CfgEdge(CfgNode* src, CfgNode* dst, unsigned long long count)
+	: m_src(src), m_dst(dst), m_count(count) {
 	assert(src != 0);
 	assert(dst != 0);
 }

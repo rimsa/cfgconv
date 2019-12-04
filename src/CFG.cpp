@@ -29,9 +29,9 @@
 #include <CfgNode.h>
 #include <CfgEdge.h>
 
-CFG::CFG(Addr addr) : m_addr(addr), m_status(CFG::UNCHECKED),
+CFG::CFG(Addr addr, unsigned long long execs) : m_addr(addr), m_status(CFG::UNCHECKED),
 		m_functionName("unknown"), m_complete(false),
-		m_entryNode(0), m_exitNode(0), m_haltNode(0) {
+		m_entryNode(0), m_exitNode(0), m_haltNode(0), m_execs(execs) {
 }
 
 CFG::~CFG() {
@@ -91,30 +91,35 @@ void CFG::addNode(CfgNode* node) {
 	m_status = CFG::UNCHECKED;
 }
 
-bool CFG::containsEdge(CfgNode* src, CfgNode* dst) const {
-	if (!src || !this->containsNode(src) ||
-		!dst || !this->containsNode(dst))
-		return false;
+CfgEdge* CFG::findEdge(CfgNode* src, CfgNode* dst) const {
+	if (this->containsNode(src) && this->containsNode(dst)) {
+		for (CfgEdge* edge : this->edges()) {
+			if (edge->source() == src && edge->destination() == dst)
+				return edge;
+		}
+	}
 
-	std::map<CfgNode*, std::set<CfgNode*>>::const_iterator it = m_succs.find(src);
-	return (it != m_succs.end() ? (it->second.count(dst) == 1) : false);
+	return 0;
 }
 
-void CFG::addEdge(CfgNode* src, CfgNode* dst) {
+void CFG::addEdge(CfgNode* src, CfgNode* dst, unsigned long long count) {
 	assert(src != 0 && this->containsNode(src));
 	assert(dst != 0 && this->containsNode(dst));
-	
-	// This edge was already added.
-	if (m_succs[src].count(dst) > 0)
-		return;
 
-	CfgEdge* edge = new CfgEdge(src, dst);
-	m_edges.insert(edge);
+	CfgEdge* edge = this->findEdge(src, dst);
+	if (edge)
+		// Update edge count if already added.
+		edge->updateCount(count);
+	else {
+		// Create and add edge.
+		edge = new CfgEdge(src, dst, count);
+		m_edges.insert(edge);
 
-	m_succs[src].insert(dst);
-	m_preds[dst].insert(src);
+		m_succs[src].insert(dst);
+		m_preds[dst].insert(src);
 
-	m_status = CFG::UNCHECKED;
+		m_status = CFG::UNCHECKED;
+	}
 }
 
 static std::set<CfgNode*> emptyset;
@@ -136,36 +141,63 @@ const std::set<CfgNode*>& CFG::predecessors(CfgNode* node) const {
 enum CFG::Status CFG::check() {
 	m_complete = true;
 	m_status = CFG::INVALID;
+	unsigned long long leaving = 0;
 
 	if (!m_entryNode || (!m_exitNode && !m_haltNode))
 		goto out;
 
 	for (CfgNode* node : this->nodes()) {
-		CfgNode::BlockData* bdata;
-
 		switch (node->type()) {
-			case CfgNode::CFG_ENTRY:
+			case CfgNode::CFG_ENTRY: {
 				if (this->predecessors(node).size() != 0)
 					goto out;
-				else {
-					const std::set<CfgNode*>& tmp = this->successors(node);
-					if (tmp.size() == 0 || CfgNode::node2addr(*tmp.begin()) != this->addr())
-						goto out;
-				}
 
-				break;
-			case CfgNode::CFG_BLOCK:
+				const std::set<CfgNode*>& tmp = this->successors(node);
+				if (tmp.size() != 1)
+					goto out;
+
+				CfgNode* dst = *(tmp.begin());
+				if (CfgNode::node2addr(dst) != this->addr())
+					goto out;
+
+				CfgEdge* edge = this->findEdge(node, dst);
+				assert(edge != 0);
+				if (edge->count() != this->execs())
+					goto out;
+
+				} break;
+			case CfgNode::CFG_BLOCK: {
 				if (this->predecessors(node).size() == 0 ||
 					this->successors(node).size() == 0)
 					goto out;
 
-				bdata = static_cast<CfgNode::BlockData*>(node->data());
+				CfgNode::BlockData* bdata =
+					static_cast<CfgNode::BlockData*>(node->data());
 				assert(bdata != 0);
 				if (bdata->indirect())
 					m_complete = false;
 
-				break;
-			case CfgNode::CFG_PHANTOM:
+				unsigned long long preds_count = 0;
+				for (CfgNode* src : this->predecessors(node)) {
+					CfgEdge* edge = this->findEdge(src, node);
+					assert(edge != 0);
+
+					preds_count += edge->count();
+				}
+
+				unsigned long long succs_count = 0;
+				for (CfgNode* dst : this->successors(node)) {
+					CfgEdge* edge = this->findEdge(node, dst);
+					assert(edge != 0);
+
+					succs_count += edge->count();
+				}
+
+				if (preds_count != succs_count)
+					goto out;
+
+				} break;
+			case CfgNode::CFG_PHANTOM: {
 				if (this->predecessors(node).size() == 0 ||
 					this->successors(node).size() != 0)
 					goto out;
@@ -173,18 +205,39 @@ enum CFG::Status CFG::check() {
 				assert(node->data() != 0);
 				m_complete = false;
 
-				break;
+				unsigned long long preds_count = 0;
+				for (CfgNode* src : this->predecessors(node)) {
+					CfgEdge* edge = this->findEdge(src, node);
+					assert(edge != 0);
+
+					preds_count += edge->count();
+				}
+
+				if (preds_count != 0)
+					goto out;
+
+				} break;
 			case CfgNode::CFG_EXIT:
 			case CfgNode::CFG_HALT:
 				if (this->predecessors(node).size() == 0 ||
 					this->successors(node).size() != 0)
 					goto out;
 
+				for (CfgNode* src : this->predecessors(node)) {
+					CfgEdge* edge = this->findEdge(src, node);
+					assert(edge != 0);
+
+					leaving += edge->count();
+				}
+
 				break;
 			default:
 				assert(false);
 		}
 	}
+
+	if (leaving != this->execs())
+		goto out;
 
 	m_status = CFG::VALID;
 
@@ -289,6 +342,8 @@ std::string CFG::toDOT() const {
 	}
 
 	for (CfgEdge* edge : m_edges) {
+		ss << std::hex;
+
 		CfgNode* src = edge->source();
 		switch (src->type()) {
 			case CfgNode::CFG_ENTRY:
@@ -318,6 +373,11 @@ std::string CFG::toDOT() const {
 			default:
 				assert(false);
 		}
+
+		if (src->type() == CfgNode::CFG_ENTRY)
+			ss << std::dec << " [label=\" " << this->execs() << "\"]";
+		else
+			ss << std::dec << " [label=\" " << edge->count() << "\"]";
 
 		ss << std::endl;
 	}
@@ -361,14 +421,18 @@ std::string node2name(CfgNode* node) {
 std::string CFG::str() const {
 	std::stringstream ss;
 
-	ss << std::hex << "[cfg 0x" << this->addr() << " \"" << this->functionName()
+	ss << std::hex << "[cfg 0x" << this->addr();
+	if (this->execs() > 0)
+		ss << std::dec << ":" << this->execs();
+
+	ss << " \"" << this->functionName()
 	   << "\" " << (this->complete() ? "true" : "false") << "]" << std::endl;
 	for (CfgNode* node : this->nodes()) {
 		// Only output block nodes.
 		if (node->type() != CfgNode::CFG_BLOCK)
 			continue;
 
-		ss << "[node 0x" << this->addr() << " " << node2name(node);
+		ss << std::hex << "[node 0x" << this->addr() << " " << node2name(node);
 
 		CfgNode::BlockData* data = static_cast<CfgNode::BlockData*>(node->data());
 		assert(data != 0);
@@ -406,7 +470,13 @@ std::string CFG::str() const {
 			if (it != succs.cbegin())
 				ss << " ";
 
-			ss << node2name(*it);
+			CfgNode* succ = *it;
+			ss << node2name(succ);
+
+			CfgEdge* edge = this->findEdge(node, succ);
+			assert(edge != 0);
+			if (edge->count() > 0)
+				ss << std::dec << ":" << edge->count();
 		}
 		ss << "]]" << std::endl;
 	}
