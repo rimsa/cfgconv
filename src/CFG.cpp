@@ -21,6 +21,7 @@
 
 */
 
+#include <iomanip>
 #include <sstream>
 #include <cassert>
 #include <algorithm>
@@ -303,23 +304,47 @@ std::string CFG::toDOT() const {
 					}
 				}
 
-				std::set<CFG*> calls = blockData->calls();
+				const std::set<CfgCall*>& calls = blockData->calls();
 				if (!calls.empty()) {
-					ss << "     | [calls]\\l" << std::endl;
-					ss << std::hex;
-					for (std::set<CFG*>::const_iterator it = calls.cbegin(), ed = calls.cend();
+					ss << "    | [calls]\\l" << std::endl;
+					for (std::set<CfgCall*>::const_iterator it = calls.cbegin(), ed = calls.cend();
 							it != ed; it++) {
-						CFG* called = *it;
-						ss << "     &nbsp;&nbsp;0x" << called->addr() << " ("
+						CFG* called = (*it)->called();
+						unsigned long long count = (*it)->count();
+
+						ss << std::hex << "    &nbsp;&nbsp;0x" << called->addr();
+						if (count > 0)
+							ss << std::dec << " \\{" << count << "\\} ";
+
+						ss << " ("
 							<< dotFilter(called->functionName()) << ")\\l" << std::endl;
+					}
+				}
+
+				const std::set<CfgSignalHandler*>& signalHandlers = blockData->signalHandlers();
+				if (!signalHandlers.empty()) {
+					ss << "    | [signals]\\l" << std::endl;
+					for (std::set<CfgSignalHandler*>::const_iterator it = signalHandlers.cbegin(),
+							ed = signalHandlers.cend(); it != ed; it++) {
+						int sigid = (*it)->sigid();
+						CFG* handler = (*it)->handler();
+						unsigned long long count = (*it)->count();
+
+						ss << std::dec << "    &nbsp;&nbsp;" << std::setfill('0') << std::setw(2) << sigid << ": ";
+						ss << std::hex << "0x" << handler->addr();
+						if (count > 0)
+							ss << std::dec << " \\{" << count << "\\} ";
+
+						ss << " ("
+							<< dotFilter(handler->functionName()) << ")\\l" << std::endl;
 					}
 				}
 
 				ss << "  }\"]" << std::endl;
 
                 if (blockData->indirect()) {
-                		ss << "  \"Unknown" << std::dec << unknown << "\" [label=\"?\", shape=none]" << std::endl;
-                		ss << "  \"0x" << std::hex << blockData->addr() << "\" -> \"Unknown" << std::dec << unknown << "\" [style=dashed]" << std::endl;
+					ss << "  \"Unknown" << std::dec << unknown << "\" [label=\"?\", shape=none]" << std::endl;
+					ss << "  \"0x" << std::hex << blockData->addr() << "\" -> \"Unknown" << std::dec << unknown << "\" [style=dashed]" << std::endl;
                     unknown++;
                 }
 
@@ -450,14 +475,37 @@ std::string CFG::str() const {
 		}
 		ss << "]";
 
-		ss << std::hex << " [";
-		const std::set<CFG*>& calls = data->calls();
-		for (std::set<CFG*>::const_iterator it = calls.cbegin(),
+		ss << " [";
+		const std::set<CfgCall*>& calls = data->calls();
+		for (std::set<CfgCall*>::const_iterator it = calls.cbegin(),
 				ed = calls.cend(); it != ed; ++it) {
 			if (it != calls.begin())
 				ss << " ";
 
-			ss << "0x" << (*it)->addr();
+			CFG* called = (*it)->called();
+			unsigned long long count = (*it)->count();
+
+			ss << std::hex << "0x" << called->addr();
+			if (count > 0)
+				ss << std::dec << ":" << count;
+		}
+		ss << "]";
+
+		ss << " [";
+		const std::set<CfgSignalHandler*>& signalHandlers = data->signalHandlers();
+		for (std::set<CfgSignalHandler*>::const_iterator it = signalHandlers.cbegin(),
+				ed = signalHandlers.cend(); it != ed; ++it) {
+			if (it != signalHandlers.begin())
+				ss << " ";
+
+			int sigid = (*it)->sigid();
+			CFG* handler = (*it)->handler();
+			unsigned long long count = (*it)->count();
+
+			ss << std::dec << sigid << "->";
+			ss << std::hex << "0x" << handler->addr();
+			if (count > 0)
+				ss << std::dec << ":" << count;
 		}
 		ss << "]";
 	

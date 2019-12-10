@@ -32,8 +32,6 @@ CFGGrindReader::CFGGrindReader(const std::string& filename)
 CFGGrindReader::~CFGGrindReader() {
 }
 
-#include <iostream>
-
 void CFGGrindReader::loadCFGs() {
 	while (m_current.type == InputTokenizer::Lexeme::TKN_BRACKET_OPEN) {
 		matchToken(InputTokenizer::Lexeme::TKN_BRACKET_OPEN);
@@ -110,8 +108,39 @@ void CFGGrindReader::loadCFGs() {
 				Addr caddr = m_current.data.addr;
 				matchToken(InputTokenizer::Lexeme::TKN_ADDR);
 
+				unsigned long long count = 0;
+				if (m_current.type == InputTokenizer::Lexeme::TKN_COLON) {
+					matchToken(InputTokenizer::Lexeme::TKN_COLON);
+
+					count = m_current.data.number;
+					matchToken(InputTokenizer::Lexeme::TKN_NUMBER);
+				}
+
 				CFG* call = this->instance(caddr);
-				data->addCall(call);
+				data->addCall(call, count);
+			}
+			matchToken(InputTokenizer::Lexeme::TKN_BRACKET_CLOSE);
+
+			matchToken(InputTokenizer::Lexeme::TKN_BRACKET_OPEN);
+			while (m_current.type != InputTokenizer::Lexeme::TKN_BRACKET_CLOSE) {
+				int sigid = m_current.data.number;
+				matchToken(InputTokenizer::Lexeme::TKN_NUMBER);
+
+				matchToken(InputTokenizer::Lexeme::TKN_ARROW);
+
+				Addr saddr = m_current.data.addr;
+				matchToken(InputTokenizer::Lexeme::TKN_ADDR);
+
+				unsigned long long count = 0;
+				if (m_current.type == InputTokenizer::Lexeme::TKN_COLON) {
+					matchToken(InputTokenizer::Lexeme::TKN_COLON);
+
+					count = m_current.data.number;
+					matchToken(InputTokenizer::Lexeme::TKN_NUMBER);
+				}
+
+				CFG* handler = this->instance(saddr);
+				data->addSignalHandler(sigid, handler, count);
 			}
 			matchToken(InputTokenizer::Lexeme::TKN_BRACKET_CLOSE);
 
@@ -142,7 +171,7 @@ void CFGGrindReader::loadCFGs() {
 						else if (keyword == "halt")
 							dst = CFGReader::haltNode(cfg);
 						else {
-							std::cout << keyword << std::endl;
+							// std::cout << keyword << std::endl;
 							assert(false);
 						}
 

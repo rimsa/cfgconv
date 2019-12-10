@@ -22,8 +22,9 @@
 
 #include <cassert>
 
-#include <Instruction.h>
+#include <CFG.h>
 #include <CfgNode.h>
+#include <Instruction.h>
 
 CfgNode::CfgNode(enum CfgNode::Type type)
 	: m_type(type), m_data(0) {
@@ -82,6 +83,18 @@ CfgNode::BlockData::BlockData(Addr addr, int size, bool indirect)
 	}
 }
 
+CfgNode::BlockData::~BlockData() {
+	for (std::map<Addr, CfgCall*>::iterator it = m_calls.begin(),
+			ed = m_calls.end(); it != ed; it++) {
+		delete it->second;
+	}
+
+	for (std::map<int, CfgSignalHandler*>::iterator it = m_signalHandlers.begin(),
+			ed = m_signalHandlers.end(); it != ed; it++) {
+		delete it->second;
+	}
+}
+
 void CfgNode::BlockData::setIndirect(bool indirect) {
 	m_indirect = indirect;
 }
@@ -121,16 +134,64 @@ void CfgNode::BlockData::clearInstructions() {
 	m_size = 0;
 }
 
-void CfgNode::BlockData::addCall(CFG* cfg) {
-	m_calls.insert(cfg);
+std::set<CfgCall*> CfgNode::BlockData::calls() const {
+	std::set<CfgCall*> cfgCalls;
+
+	std::transform(m_calls.begin(), m_calls.end(),
+			std::inserter(cfgCalls, cfgCalls.begin()),
+			[](const std::map<Addr, CfgCall*>::value_type &pair) {
+					return pair.second;
+			}
+	);
+
+	return cfgCalls;
 }
 
-void CfgNode::BlockData::addCalls(const std::set<CFG*>& calls) {
-	m_calls.insert(calls.cbegin(), calls.cend());
+void CfgNode::BlockData::addCall(CFG* cfg, unsigned long long count) {
+	Addr addr = cfg->addr();
+	std::map<Addr, CfgCall*>::const_iterator it = m_calls.find(addr);
+	if (it != m_calls.end()) {
+		CfgCall* cfgCall = it->second;
+		cfgCall->updateCount(count);
+	} else {
+		CfgCall* cfgCall = new CfgCall(cfg, count);
+		m_calls[addr] = cfgCall;
+	}
 }
 
 void CfgNode::BlockData::clearCalls() {
 	m_calls.clear();
+}
+
+std::set<CfgSignalHandler*> CfgNode::BlockData::signalHandlers() const {
+	std::set<CfgSignalHandler*> cfgSignalHandlers;
+
+	std::transform(m_signalHandlers.begin(), m_signalHandlers.end(),
+			std::inserter(cfgSignalHandlers, cfgSignalHandlers.begin()),
+			[](const std::map<int, CfgSignalHandler*>::value_type &pair) {
+					return pair.second;
+			}
+	);
+
+	return cfgSignalHandlers;
+}
+
+void CfgNode::BlockData::addSignalHandler(int sigid, CFG* handler, unsigned long long count) {
+	assert(sigid > 0);
+
+	std::map<int, CfgSignalHandler*>::const_iterator it = m_signalHandlers.find(sigid);
+	if (it != m_signalHandlers.end()) {
+		CfgSignalHandler* cfgSignalHandler = it->second;
+		assert(cfgSignalHandler->handler()->addr() == handler->addr());
+		cfgSignalHandler->updateCount(count);
+	} else {
+		CfgSignalHandler* cfgSignalHandler = new CfgSignalHandler(sigid, handler, count);
+		m_signalHandlers[sigid] = cfgSignalHandler;
+	}
+}
+
+void CfgNode::BlockData::clearSignalHandlers() {
+	m_signalHandlers.clear();
 }
 
 Addr CfgNode::node2addr(CfgNode* node) {

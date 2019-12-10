@@ -34,7 +34,7 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 	Lexeme lex;
 
 	int state = 1;
-	while (state != 8) {
+	while (state != 9) {
 		int c = this->nextChar();
 		switch (state) {
 			case 1:
@@ -55,26 +55,29 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 				} else if (c == '[') {
 					lex.token += (char) c;
 					lex.type = Lexeme::TKN_BRACKET_OPEN;
-					state = 8;
+					state = 9;
 				} else if (c == ']') {
 					lex.token += (char) c;
 					lex.type = Lexeme::TKN_BRACKET_CLOSE;
-					state = 8;
+					state = 9;
 				} else if (c == ':') {
 					lex.token += (char) c;
 					lex.type = Lexeme::TKN_COLON;
-					state = 8;
+					state = 9;
 				} else if (c == '\"' || c == '\'') {
 					lex.type = Lexeme::TKN_STRING;
 					state = 6;
-				} else if (c == '#') {
+				} else if (c == '-') {
+					lex.token += (char) c;
 					state = 7;
+				} else if (c == '#') {
+					state = 8;
 				} else if (c == -1) {
 					lex.type = Lexeme::TKN_EOF;
-					state = 8;
+					state = 9;
 				} else {
 					lex.type = Lexeme::TKN_INVALID_TOKEN;
-					state = 8;
+					state = 9;
 				}
 
 				break;
@@ -87,7 +90,7 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 					if (c != -1)
 						m_input.putback(c);
 
-					state = 8;
+					state = 9;
 				}
 
 				break;
@@ -102,7 +105,7 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 					if (c != -1)
 						m_input.putback(c);
 
-					state = 8;
+					state = 9;
 				}
 
 				break;
@@ -116,7 +119,7 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 					if (c != -1)
 						m_input.putback(c);
 
-					state = 8;
+					state = 9;
 				}
 
 				break;
@@ -141,17 +144,17 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 					if (c != -1)
 						m_input.putback(c);
 
-					state = 8;
+					state = 9;
 				}
 
 				break;
 			case 6:
 				if (c == -1) {
 					lex.type = Lexeme::TKN_UNEXPECTED_EOF;
-					state = 8;
+					state = 9;
 				} else {
 					if (c == '\"' || c == '\'')
-						state = 8;
+						state = 9;
 					else {
 						lex.token += (char) c;
 						state = 6;
@@ -161,18 +164,34 @@ InputTokenizer::Lexeme InputTokenizer::nextToken() {
 				break;
 			case 7:
 				if (c == -1) {
-					state = 8;
+					lex.type = Lexeme::TKN_UNEXPECTED_EOF;
+					state = 9;
+				} else {
+					if (c == '>') {
+						lex.token += (char) c;
+						lex.type = Lexeme::TKN_ARROW;
+						state = 9;
+					} else {
+						lex.type = Lexeme::TKN_INVALID_TOKEN;
+						state = 9;
+					}
+				}
+
+				break;
+			case 8:
+				if (c == -1) {
+					state = 9;
 				} else {
 					if (c == '\n')
 						state = 1;
 					else
-						state = 7;
+						state = 8;
 				}
 
 				break;
 			default:
 				lex.type = Lexeme::TKN_INVALID_TOKEN;
-				state = 8;
+				state = 9;
 				break;
 		}
 	}

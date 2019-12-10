@@ -30,6 +30,44 @@
 
 class CFG;
 
+class CfgCall {
+public:
+	CfgCall(CFG* called, unsigned long long count = 0)
+		: m_called(called), m_count(count) {}
+	virtual ~CfgCall() {}
+
+	CFG* called() const { return m_called; }
+
+	unsigned long long count() const { return m_count; }
+	void setCount(unsigned long long count) { m_count = count; }
+	void updateCount(unsigned long long count) { m_count += count; }
+
+private:
+	CFG* m_called;
+	unsigned long long m_count;
+
+};
+
+class CfgSignalHandler {
+public:
+	CfgSignalHandler(int sigid, CFG* handler, unsigned long long count = 0)
+		: m_sigid(sigid), m_handler(handler), m_count(count) {}
+	virtual ~CfgSignalHandler() {}
+
+	int sigid() const { return m_sigid; }
+	CFG* handler() const { return m_handler; }
+
+	unsigned long long count() const { return m_count; }
+	void setCount(unsigned long long count) { m_count = count; }
+	void updateCount(unsigned long long count) { m_count += count; }
+
+private:
+	int m_sigid;
+	CFG* m_handler;
+	unsigned long long m_count;
+
+};
+
 class CfgNode {
 public:
 	enum Type {
@@ -61,7 +99,7 @@ public:
 	class BlockData : public Data {
 	public:
 		BlockData(Addr addr, int size = 0, bool indirect = false);
-		virtual ~BlockData() {};
+		virtual ~BlockData();
 
 		int size() const { return m_size; }
 
@@ -75,17 +113,21 @@ public:
 		Instruction* lastInstruction() const;
 		void clearInstructions();
 
-		const std::set<CFG*>& calls() const { return m_calls; }
-		void addCall(CFG* cfg);
-		void addCalls(const std::set<CFG*>& calls);
+		std::set<CfgCall*> calls() const;
+		void addCall(CFG* cfg, unsigned long long count = 0);
 		void clearCalls();
+
+		std::set<CfgSignalHandler*> signalHandlers() const;
+		void addSignalHandler(int sigid, CFG* handler, unsigned long long count = 0);
+		void clearSignalHandlers();
 
 	private:
 		int m_size;
 		bool m_indirect;
 		std::list<Instruction*> m_instrs;
-		std::set<CFG*> m_calls;
-	
+		std::map<Addr, CfgCall*> m_calls;
+		std::map<int, CfgSignalHandler*> m_signalHandlers;
+
 	};
 
 	CfgNode(enum CfgNode::Type type);
