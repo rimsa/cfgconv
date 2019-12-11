@@ -205,6 +205,20 @@ void readoptions(int argc, char* argv[]) {
 		throw std::string("-t option is mandatory");
 }
 
+bool isAddrInRange(Addr addr) {
+	// if the range list is empty, consider the address in range.
+	if (config.ranges.size() == 0)
+		return true;
+
+	for (std::list<std::pair<Addr, Addr> >::const_iterator it =  config.ranges.cbegin(),
+			ed = config.ranges.cend(); it != ed; it++) {
+		if (addr >= it->first && addr <= it->second)
+			return true;
+	}
+
+	return false;
+}
+
 int main(int argc, char* argv[]) {
 	CFGReader* reader = 0;
 	try {
@@ -212,7 +226,6 @@ int main(int argc, char* argv[]) {
 
 		if (config.instrs)
 			Instruction::load(std::string(config.instrs));
-
 
 		switch (config.type) {
 			case Config::BFTRACE_TYPE:
@@ -230,6 +243,9 @@ int main(int argc, char* argv[]) {
 
 		reader->loadCFGs();
 		for (CFG* cfg : reader->cfgs()) {
+			if (!isAddrInRange(cfg->addr()))
+				continue;
+
 			bool show;
 			switch (config.show) {
 				case Config::SHOW_ALL:
