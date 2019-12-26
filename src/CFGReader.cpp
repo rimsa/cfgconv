@@ -21,6 +21,8 @@
 */
 
 #include <cassert>
+#include <algorithm>
+
 #include <CFG.h>
 #include <CfgEdge.h>
 #include <CfgNode.h>
