@@ -128,11 +128,6 @@ void DCFGReader::buildCFG(int entry) {
 					CFG* called = this->instance(dst_addr);
 					CFGReader::addCall(src_node, called, count,
 						m_visited.find(src_id) == m_visited.cend());
-
-					CfgNode::BlockData* bdata = static_cast<CfgNode::BlockData*>(src_node->data());
-					assert(bdata != 0);
-					Addr fallthrough_addr = bdata->addr() + bdata->size();
-					cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, fallthrough_addr), count);
 					} break;
 				case EXIT_EDGE:
 					// The destination must be the special exit node (2).
