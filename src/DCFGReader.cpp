@@ -155,6 +155,7 @@ void DCFGReader::loadCFGs() {
 					case INDIRECT_CALL_EDGE:
 						CFGReader::markIndirect(src_node);
 						// fallthrough
+					case SYSTEM_CALL_EDGE:
 					case DIRECT_CALL_EDGE: {
 						CFG* called = this->instance(dst_addr);
 						CFGReader::addCall(src_node, called, count);
@@ -172,6 +173,10 @@ void DCFGReader::loadCFGs() {
 					case RETURN_EDGE:
 						cfg->addEdge(src_node, CFGReader::exitNode(cfg), count);
 						break;
+					case CONTEXT_CHANGE_EDGE: {
+						CFG* sigHandler = this->instance(dst_addr);
+						CFGReader::addSignalHandler(src_node, 0, sigHandler, count);
+						} break;
 					default: {
 						// std::vector<std::string> edgeTypes = readStrings(obj, "EDGE_TYPES");
 						// std::cout << "edge type: " << edgeTypes[edge.edge_type] << "\n";

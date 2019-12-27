@@ -139,3 +139,13 @@ void CFGReader::addCall(CfgNode* node, CFG* called, unsigned long long count) {
 		edge->updateCount(count);
 	}
 }
+
+void CFGReader::addSignalHandler(CfgNode* node, int sigid, CFG* sigHandler, unsigned long long count) {
+	assert(node->type() == CfgNode::CFG_BLOCK);
+	CfgNode::BlockData* data =
+		static_cast<CfgNode::BlockData*>(node->data());
+	assert(data != 0);
+	data->addSignalHandler(sigid, sigHandler, count);
+
+	sigHandler->updateExecs(count);
+}

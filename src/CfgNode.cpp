@@ -179,7 +179,7 @@ std::set<CfgSignalHandler*> CfgNode::BlockData::signalHandlers() const {
 }
 
 void CfgNode::BlockData::addSignalHandler(int sigid, CFG* handler, unsigned long long count) {
-	assert(sigid > 0);
+	assert(sigid >= 0);
 
 	std::map<int, CfgSignalHandler*>::const_iterator it = m_signalHandlers.find(sigid);
 	if (it != m_signalHandlers.end()) {
