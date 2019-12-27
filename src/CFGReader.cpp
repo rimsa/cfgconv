@@ -126,7 +126,7 @@ void CFGReader::addCall(CfgNode* node, CFG* called, unsigned long long count) {
 	CfgNode::BlockData* data =
 		static_cast<CfgNode::BlockData*>(node->data());
 	assert(data != 0);
-	data->addCall(called);
+	data->addCall(called, count);
 
 	called->updateExecs(count);
 
