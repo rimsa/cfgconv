@@ -121,40 +121,46 @@ void CFGReader::markIndirect(CfgNode* node) {
 	data->setIndirect(true);
 }
 
-void CFGReader::addCall(CfgNode* node, CFG* called, unsigned long long count) {
+void CFGReader::addCall(CfgNode* node, CFG* called,
+					unsigned long long count, bool update) {
 	assert(node->type() == CfgNode::CFG_BLOCK);
 	CfgNode::BlockData* data =
 		static_cast<CfgNode::BlockData*>(node->data());
 	assert(data != 0);
 	data->addCall(called, count);
 
-	called->updateExecs(count);
+	if (update) {
+		called->updateExecs(count);
 
-	CfgNode* entry = called->entryNode();
-	CfgNode* first = called->nodeByAddr(called->addr());
-	if (entry && first) {
-		CfgEdge* edge = called->findEdge(entry, first);
-		assert(edge != 0);
+		CfgNode* entry = called->entryNode();
+		CfgNode* first = called->nodeByAddr(called->addr());
+		if (entry && first) {
+			CfgEdge* edge = called->findEdge(entry, first);
+			assert(edge != 0);
 
-		edge->updateCount(count);
+			edge->updateCount(count);
+		}
 	}
 }
 
-void CFGReader::addSignalHandler(CfgNode* node, int sigid, CFG* sigHandler, unsigned long long count) {
+void CFGReader::addSignalHandler(CfgNode* node, int sigid, CFG* sigHandler,
+					unsigned long long count, bool update) {
 	assert(node->type() == CfgNode::CFG_BLOCK);
 	CfgNode::BlockData* data =
 		static_cast<CfgNode::BlockData*>(node->data());
 	assert(data != 0);
 	data->addSignalHandler(sigid, sigHandler, count);
 
-	sigHandler->updateExecs(count);
+	if (update) {
+		sigHandler->updateExecs(count);
 
-	CfgNode* entry = sigHandler->entryNode();
-	CfgNode* first = sigHandler->nodeByAddr(sigHandler->addr());
-	if (entry && first) {
-		CfgEdge* edge = sigHandler->findEdge(entry, first);
-		assert(edge != 0);
+		CfgNode* entry = sigHandler->entryNode();
+		CfgNode* first = sigHandler->nodeByAddr(sigHandler->addr());
+		if (entry && first) {
+			CfgEdge* edge = sigHandler->findEdge(entry, first);
+			assert(edge != 0);
 
-		edge->updateCount(count);
+			edge->updateCount(count);
+		}
 	}
 }

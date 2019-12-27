@@ -126,7 +126,8 @@ void DCFGReader::buildCFG(int entry) {
 				case SYSTEM_CALL_EDGE:
 				case DIRECT_CALL_EDGE: {
 					CFG* called = this->instance(dst_addr);
-					CFGReader::addCall(src_node, called, count);
+					CFGReader::addCall(src_node, called, count,
+						m_visited.find(src_id) == m_visited.cend());
 
 					CfgNode::BlockData* bdata = static_cast<CfgNode::BlockData*>(src_node->data());
 					assert(bdata != 0);
@@ -143,7 +144,9 @@ void DCFGReader::buildCFG(int entry) {
 					break;
 				case CONTEXT_CHANGE_EDGE: {
 					CFG* sigHandler = this->instance(dst_addr);
-					CFGReader::addSignalHandler(src_node, 0, sigHandler, count);
+					CFGReader::addSignalHandler(src_node, 0, sigHandler, count,
+						m_visited.find(src_id) == m_visited.cend());
+
 					} break;
 				default: {
 					// std::vector<std::string> edgeTypes = readStrings(obj, "EDGE_TYPES");
@@ -152,6 +155,9 @@ void DCFGReader::buildCFG(int entry) {
 					} break;
 			}
 		}
+
+		// Added to the global visited ids.
+		m_visited.insert(src_id);
 	}
 }
 

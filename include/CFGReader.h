@@ -56,8 +56,10 @@ protected:
 	static CfgNode* exitNode(CFG* cfg);
 	static CfgNode* haltNode(CFG* cfg);
 	static void markIndirect(CfgNode* node);
-	static void addCall(CfgNode* node, CFG* called, unsigned long long count = 0);
-	static void addSignalHandler(CfgNode* node, int sigid, CFG* sigHandler, unsigned long long count = 0);
+	static void addCall(CfgNode* node, CFG* called,
+					unsigned long long count = 0, bool update = false);
+	static void addSignalHandler(CfgNode* node, int sigid, CFG* sigHandler,
+					unsigned long long count = 0, bool update = false);
 
 };
 

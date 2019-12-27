@@ -105,6 +105,7 @@ private:
 	std::map<Addr, Symbol> m_symbols;
 
 	std::set<int> m_entries;
+	std::set<int> m_visited;
 
 	void buildCFG(int entry);
 
