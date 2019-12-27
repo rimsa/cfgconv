@@ -78,7 +78,8 @@ CfgNode::BlockData::BlockData(Addr addr, int size, bool indirect)
 			break;
 
 		s += i->size();
-		assert(s <= size);
+		if (s > size)
+			break;
 
 		this->addInstruction(i);
 	}
