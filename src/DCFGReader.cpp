@@ -61,131 +61,114 @@ std::vector<std::string> readStrings(json& obj, const std::string& field) {
 	return container;
 }
 
+void DCFGReader::buildCFG(int entry) {
+	CFG* cfg = this->instance(m_nodes[entry].addr);
+
+	// Add special entry node.
+	assert(cfg->entryNode() == 0);
+	CfgNode* entry_node = new CfgNode(CfgNode::CFG_ENTRY);
+	cfg->addNode(entry_node);
+
+	// Add the first node.
+	assert(cfg->nodeByAddr(m_nodes[entry].addr) == 0);
+	cfg->addEdge(entry_node, CFGReader::nodeWithAddr(cfg, m_nodes[entry].addr),
+					cfg->execs());
+
+	std::set<int> visited;
+	std::list<int> worklist;
+	worklist.push_back(entry);
+
+	while (!worklist.empty()) {
+		int src_id = worklist.front();
+		worklist.pop_front();
+		assert(src_id > 3);
+
+		if (visited.find(src_id) != visited.cend())
+			continue;
+		visited.insert(src_id);
+
+		DCFGReader::Node& src_bb = m_nodes[src_id];
+		CfgNode* src_node = cfg->nodeByAddr(src_bb.addr);
+		assert(src_node != 0 && src_node->type() == CfgNode::CFG_PHANTOM);
+		src_node->setData(new CfgNode::BlockData(src_bb.addr, src_bb.size));
+
+		for (DCFGReader::Edge& edge : m_edges[src_id]) {
+			// Ignore unknown node.
+			if (edge.dst_id == UNKNOWN_NODE)
+				continue;
+
+			std::map<int, Node>::const_iterator it = m_nodes.find(edge.dst_id);
+			Addr dst_addr = (it != m_nodes.end() ? (it->second).addr : 0);
+
+			unsigned long long count = edge.count;
+
+			switch (edge.edge_type) {
+				case INDIRECT_UNCONDITIONAL_BRANCH_EDGE:
+					CFGReader::markIndirect(src_node);
+					// fallthrough.
+				case REP_EDGE:
+				case CALL_BYPASS_EDGE:
+				case SYSTEM_CALL_BYPASS_EDGE:
+				case DIRECT_UNCONDITIONAL_BRANCH_EDGE:
+				case FALL_THROUGH_EDGE:
+				case EXCLUDED_CODE_BYPASS_EDGE:
+					cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, dst_addr), count);
+					worklist.push_back(edge.dst_id);
+					break;
+				case DIRECT_CONDITIONAL_BRANCH_EDGE:
+					cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, dst_addr), count);
+					cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, src_bb.addr + src_bb.size));
+					worklist.push_back(edge.dst_id);
+					break;
+				case INDIRECT_CALL_EDGE:
+					CFGReader::markIndirect(src_node);
+					// fallthrough
+				case SYSTEM_CALL_EDGE:
+				case DIRECT_CALL_EDGE: {
+					CFG* called = this->instance(dst_addr);
+					CFGReader::addCall(src_node, called, count);
+
+					CfgNode::BlockData* bdata = static_cast<CfgNode::BlockData*>(src_node->data());
+					assert(bdata != 0);
+					Addr fallthrough_addr = bdata->addr() + bdata->size();
+					cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, fallthrough_addr), count);
+					} break;
+				case EXIT_EDGE:
+					// The destination must be the special exit node (2).
+					assert(edge.dst_id == 2);
+					cfg->addEdge(src_node, CFGReader::haltNode(cfg), count);
+					break;
+				case RETURN_EDGE:
+					cfg->addEdge(src_node, CFGReader::exitNode(cfg), count);
+					break;
+				case CONTEXT_CHANGE_EDGE: {
+					CFG* sigHandler = this->instance(dst_addr);
+					CFGReader::addSignalHandler(src_node, 0, sigHandler, count);
+					} break;
+				default: {
+					// std::vector<std::string> edgeTypes = readStrings(obj, "EDGE_TYPES");
+					// std::cout << "edge type: " << edgeTypes[edge.edge_type] << "\n";
+					assert(false);
+					} break;
+			}
+		}
+	}
+}
+
 void DCFGReader::loadCFGs() {
 	json obj;
+
+	// We consider the first block (4, the first id after the special ones)
+	// as an CFG entry.
+	m_entries.insert(4);
 
 	m_input >> obj;
 
 	m_filenames = readStrings(obj, "FILE_NAMES");
 	readProcesses(obj);
 
-	for (DCFGReader::Routine& routine : m_routines) {
-		assert(m_nodes.find(routine.entry_bb) != m_nodes.end());
-		DCFGReader::Node& entry_bb = m_nodes[routine.entry_bb];
-
-		CFG* cfg = this->instance(entry_bb.addr);
-		assert(cfg != 0);
-
-		if (m_symbols.find(cfg->addr()) != m_symbols.end()) {
-			DCFGReader::Symbol& s = m_symbols[cfg->addr()];
-
-			std::string name = m_filenames[s.file_id] + "::" + s.fname;
-			if (s.lineno != -1)
-				name += "(" + std::to_string(s.lineno) + ")";
-
-			cfg->setFunctionName(name);
-		}
-
-		// Add nodes.
-		for (int bb_id : routine.bbs) {
-			assert(m_nodes.find(bb_id) != m_nodes.end());
-			DCFGReader::Node& bb = m_nodes[bb_id];
-
-			assert(cfg->nodeByAddr(bb.addr) == 0);
-			CfgNode* node = new CfgNode(CfgNode::CFG_BLOCK);
-			node->setData(new CfgNode::BlockData(bb.addr, bb.size));
-			cfg->addNode(node);
-		}
-
-		// Add edges.
-		for (int src_id : routine.bbs) {
-			assert(m_nodes.find(src_id) != m_nodes.end());
-
-			DCFGReader::Node& src_bb = m_nodes[src_id];
-			CfgNode* src_node = cfg->nodeByAddr(src_bb.addr);
-			assert(src_node != 0);
-
-			// Check if it is the entry node.
-			if (src_id == routine.entry_bb) {
-				// Add entry node.
-				assert(cfg->entryNode() == 0);
-				CfgNode* entry_node = new CfgNode(CfgNode::CFG_ENTRY);
-				cfg->addNode(entry_node);
-
-				// Connect the entry to this block.
-				cfg->addEdge(entry_node, src_node, cfg->execs());
-			}
-
-			// // Check if it is an exit node.
-			// if (routine.exit_bbs.count(src_id) > 0) {
-			// 	CfgNode* exit_node = CFGReader::exitNode(cfg);
-			// 	cfg->addEdge(src_node, exit_node);
-			// }
-
-			assert(m_edges.find(src_id) != m_edges.end());
-			for (DCFGReader::Edge& edge : m_edges[src_id]) {
-				// Ignore unknown node.
-				if (edge.dst_id == UNKNOWN_NODE)
-					continue;
-
-				Addr dst_addr = 0;
-				if (m_nodes.find(edge.dst_id) != m_nodes.end()) {
-					DCFGReader::Node& dst_bb = m_nodes[edge.dst_id];
-					dst_addr = dst_bb.addr;
-				}
-
-				unsigned long long count = edge.count;
-
-				switch (edge.edge_type) {
-					case INDIRECT_UNCONDITIONAL_BRANCH_EDGE:
-						CFGReader::markIndirect(src_node);
-						// fallthrough.
-					case REP_EDGE:
-					case CALL_BYPASS_EDGE:
-					case SYSTEM_CALL_BYPASS_EDGE:
-					case DIRECT_UNCONDITIONAL_BRANCH_EDGE:
-					case FALL_THROUGH_EDGE:
-					case EXCLUDED_CODE_BYPASS_EDGE:
-						cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, dst_addr), count);
-						break;
-					case DIRECT_CONDITIONAL_BRANCH_EDGE:
-						cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, dst_addr), count);
-						cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, src_bb.addr + src_bb.size));
-						break;
-					case INDIRECT_CALL_EDGE:
-						CFGReader::markIndirect(src_node);
-						// fallthrough
-					case SYSTEM_CALL_EDGE:
-					case DIRECT_CALL_EDGE: {
-						CFG* called = this->instance(dst_addr);
-						CFGReader::addCall(src_node, called, count);
-
-						CfgNode::BlockData* bdata = static_cast<CfgNode::BlockData*>(src_node->data());
-						assert(bdata != 0);
-						Addr fallthrough_addr = bdata->addr() + bdata->size();
-						cfg->addEdge(src_node, CFGReader::nodeWithAddr(cfg, fallthrough_addr), count);
-						} break;
-					case EXIT_EDGE:
-						// The destination must be the special exit node (2).
-						assert(edge.dst_id == 2);
-						cfg->addEdge(src_node, CFGReader::haltNode(cfg), count);
-						break;
-					case RETURN_EDGE:
-						cfg->addEdge(src_node, CFGReader::exitNode(cfg), count);
-						break;
-					case CONTEXT_CHANGE_EDGE: {
-						CFG* sigHandler = this->instance(dst_addr);
-						CFGReader::addSignalHandler(src_node, 0, sigHandler, count);
-						} break;
-					default: {
-						// std::vector<std::string> edgeTypes = readStrings(obj, "EDGE_TYPES");
-						// std::cout << "edge type: " << edgeTypes[edge.edge_type] << "\n";
-						assert(false);
-						} break;
-				}
-			}
-		}
-	}
+	for (int entry : m_entries)
+		this->buildCFG(entry);
 
 	for (CFG* cfg : this->cfgs())
 		cfg->check();
@@ -355,5 +338,19 @@ void DCFGReader::readEdges(json& array) {
 			.edge_type = etype,
 			.count = count
 		});
+
+		if (dst > 3) {
+			// Targets of call and context changes are CFG entries.
+			switch (etype) {
+				case INDIRECT_CALL_EDGE:
+				case SYSTEM_CALL_EDGE:
+				case DIRECT_CALL_EDGE:
+				case CONTEXT_CHANGE_EDGE:
+					m_entries.insert(dst);
+					break;
+				default:
+					break;
+			}
+		}
 	}
 }

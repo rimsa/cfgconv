@@ -148,4 +148,13 @@ void CFGReader::addSignalHandler(CfgNode* node, int sigid, CFG* sigHandler, unsi
 	data->addSignalHandler(sigid, sigHandler, count);
 
 	sigHandler->updateExecs(count);
+
+	CfgNode* entry = sigHandler->entryNode();
+	CfgNode* first = sigHandler->nodeByAddr(sigHandler->addr());
+	if (entry && first) {
+		CfgEdge* edge = sigHandler->findEdge(entry, first);
+		assert(edge != 0);
+
+		edge->updateCount(count);
+	}
 }

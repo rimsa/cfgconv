@@ -104,6 +104,10 @@ private:
 	std::list<Routine> m_routines;
 	std::map<Addr, Symbol> m_symbols;
 
+	std::set<int> m_entries;
+
+	void buildCFG(int entry);
+
 	void readProcesses(nlohmann::json& obj);
 	void readImages(nlohmann::json& array);
 	void readBasicBlocks(Addr baseAddr, nlohmann::json& array);
